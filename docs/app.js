@@ -1,4 +1,5 @@
 const API_ENDPOINT = 'https://oiuw4wyhzb.execute-api.us-east-1.amazonaws.com/upload';
+const LIST_ENDPOINT = 'https://oiuw4wyhzb.execute-api.us-east-1.amazonaws.com/list';
 
 const fileInput = document.getElementById('file');
 const drop = document.getElementById('drop');
@@ -9,6 +10,11 @@ const preview = document.getElementById('preview');
 const result = document.getElementById('result');
 const cdnUrlEl = document.getElementById('cdnUrl');
 const meta = document.getElementById('meta');
+const folderInput = document.getElementById('folder');
+const listStatusEl = document.getElementById('list-status');
+const refreshBtn = document.getElementById('refresh-list');
+const imageGallery = document.getElementById('image-gallery');
+const videoGallery = document.getElementById('video-gallery');
 
 let currentFile = null;
 let currentCdnUrl = '';
@@ -97,7 +103,8 @@ uploadBtn.addEventListener('click', async () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         fileName: currentFile.name,
-        contentType: currentFile.type
+        contentType: currentFile.type,
+        folder: folderInput.value.trim()
       })
     });
 
@@ -140,3 +147,63 @@ copyBtn.addEventListener('click', async () => {
 });
 
 setFile(null);
+
+function setListStatus(text) {
+  listStatusEl.textContent = text;
+}
+
+function clearGallery() {
+  imageGallery.innerHTML = '';
+  videoGallery.innerHTML = '';
+}
+
+function createItem(url, key, isVideo) {
+  const card = document.createElement('div');
+  card.className = 'gallery-item';
+
+  if (isVideo) {
+    const video = document.createElement('video');
+    video.src = url;
+    video.controls = true;
+    card.appendChild(video);
+  } else {
+    const img = document.createElement('img');
+    img.src = url;
+    img.alt = key;
+    card.appendChild(img);
+  }
+
+  const meta = document.createElement('div');
+  meta.className = 'gallery-meta';
+  meta.textContent = key.replace(/^soulscape\\/(image|video)\\//, '');
+  card.appendChild(meta);
+  return card;
+}
+
+async function fetchList(type) {
+  const response = await fetch(`${LIST_ENDPOINT}?type=${encodeURIComponent(type)}`);
+  if (!response.ok) {
+    throw new Error('Failed to load list.');
+  }
+  return response.json();
+}
+
+async function refreshList() {
+  setListStatus('Loading...');
+  clearGallery();
+  try {
+    const [images, videos] = await Promise.all([fetchList('image'), fetchList('video')]);
+    images.items.forEach((item) => {
+      imageGallery.appendChild(createItem(item.cdnUrl, item.key, false));
+    });
+    videos.items.forEach((item) => {
+      videoGallery.appendChild(createItem(item.cdnUrl, item.key, true));
+    });
+    setListStatus('Loaded');
+  } catch (err) {
+    setListStatus('Error');
+  }
+}
+
+refreshBtn.addEventListener('click', refreshList);
+refreshList();

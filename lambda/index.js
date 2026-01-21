@@ -1,6 +1,5 @@
 'use strict';
 
-const crypto = require('crypto');
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
@@ -54,6 +53,7 @@ exports.handler = async (event) => {
 
   const contentType = payload && payload.contentType;
   const originalName = payload && payload.fileName;
+  const folder = payload && payload.folder;
   const prefix = resolvePrefix(contentType);
 
   if (!BUCKET || !CDN_HOST) {
@@ -64,9 +64,33 @@ exports.handler = async (event) => {
     return json(400, { error: 'Unsupported contentType. Use image/* or video/*.' });
   }
 
-  const ext = originalName && originalName.includes('.') ? originalName.split('.').pop() : '';
-  const name = crypto.randomUUID();
-  const key = ext ? `${prefix}/${name}.${ext}` : `${prefix}/${name}`;
+  if (!originalName) {
+    return json(400, { error: 'fileName is required.' });
+  }
+
+  const safeName = originalName
+    .replace(/[^A-Za-z0-9._-]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
+  if (!safeName) {
+    return json(400, { error: 'fileName is invalid.' });
+  }
+
+  const folderPath = typeof folder === 'string'
+    ? folder
+        .split('/')
+        .map((segment) =>
+          segment
+            .replace(/[^A-Za-z0-9._-]/g, '_')
+            .replace(/_+/g, '_')
+            .replace(/^_+|_+$/g, '')
+        )
+        .filter(Boolean)
+        .join('/')
+    : '';
+
+  const key = folderPath ? `${prefix}/${folderPath}/${safeName}` : `${prefix}/${safeName}`;
 
   try {
     const command = new PutObjectCommand({

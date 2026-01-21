@@ -40,6 +40,12 @@
 
         <div class="preview" id="preview"></div>
 
+        <div class="field">
+          <label for="folder">Folder (optional)</label>
+          <input id="folder" type="text" placeholder="e.g. campaign-01/hero" />
+          <span class="hint">Creates subfolders inside soulscape/image or soulscape/video.</span>
+        </div>
+
         <div class="actions">
           <button id="upload" disabled>Upload</button>
           <button id="copy" class="ghost" disabled>Copy URL</button>
@@ -52,6 +58,23 @@
           </div>
           <div class="meta" id="meta"></div>
         </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-top">
+          <div class="panel-title">
+            <h2>Current uploads</h2>
+            <span id="list-status">Idle</span>
+          </div>
+          <p class="panel-sub">Browse files already in the bucket.</p>
+        </div>
+
+        <div class="actions">
+          <button id="refresh-list">Refresh list</button>
+        </div>
+
+        <div class="gallery" id="image-gallery"></div>
+        <div class="gallery" id="video-gallery"></div>
       </section>
     </main>
 

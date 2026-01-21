@@ -1,6 +1,8 @@
 node_modules/
 lambda/node_modules/
 lambda.zip
+lambda_list/node_modules/
+lambda_list.zip
 .DS_Store
 .env
 *.json
