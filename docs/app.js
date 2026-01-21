@@ -175,7 +175,7 @@ function createItem(url, key, isVideo) {
 
   const meta = document.createElement('div');
   meta.className = 'gallery-meta';
-  meta.textContent = key.replace(/^soulscape\\/(image|video)\\//, '');
+  meta.textContent = key.replace(/^soulscape\/(image|video)\//, '');
   card.appendChild(meta);
   return card;
 }
