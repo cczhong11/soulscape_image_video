@@ -13,8 +13,7 @@ const meta = document.getElementById('meta');
 const folderInput = document.getElementById('folder');
 const listStatusEl = document.getElementById('list-status');
 const refreshBtn = document.getElementById('refresh-list');
-const imageGallery = document.getElementById('image-gallery');
-const videoGallery = document.getElementById('video-gallery');
+const fileTree = document.getElementById('file-tree');
 
 let currentFile = null;
 let currentCdnUrl = '';
@@ -152,32 +151,65 @@ function setListStatus(text) {
   listStatusEl.textContent = text;
 }
 
-function clearGallery() {
-  imageGallery.innerHTML = '';
-  videoGallery.innerHTML = '';
+function clearTree() {
+  fileTree.innerHTML = '';
 }
 
-function createItem(url, key, isVideo) {
-  const card = document.createElement('div');
-  card.className = 'gallery-item';
+function insertPath(tree, parts, item) {
+  let node = tree;
+  parts.forEach((part, idx) => {
+    node.children = node.children || {};
+    node.children[part] = node.children[part] || {};
+    node = node.children[part];
+    if (idx === parts.length - 1) {
+      node.item = item;
+    }
+  });
+}
 
-  if (isVideo) {
-    const video = document.createElement('video');
-    video.src = url;
-    video.controls = true;
-    card.appendChild(video);
+function buildTree(items, type) {
+  const root = {};
+  items.forEach((item) => {
+    const trimmed = item.key.replace(new RegExp(`^soulscape/${type}/`), '');
+    const parts = trimmed.split('/').filter(Boolean);
+    insertPath(root, parts, item);
+  });
+  return root;
+}
+
+function renderTreeNode(name, node, pathParts, type) {
+  const li = document.createElement('li');
+  const currentPath = [...pathParts, name];
+
+  if (node.item && !node.children) {
+    const link = document.createElement('a');
+    link.className = 'file-link';
+    link.href = node.item.cdnUrl;
+    link.target = '_blank';
+    link.rel = 'noreferrer';
+    link.textContent = name;
+    li.appendChild(link);
   } else {
-    const img = document.createElement('img');
-    img.src = url;
-    img.alt = key;
-    card.appendChild(img);
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'folder';
+    button.textContent = `📁 ${name}`;
+    button.addEventListener('click', () => {
+      const folderPath = currentPath.join('/');
+      folderInput.value = folderPath;
+      setStatus(`Folder set: ${folderPath}`);
+    });
+    li.appendChild(button);
+
+    const ul = document.createElement('ul');
+    const entries = Object.entries(node.children || {}).sort(([a], [b]) => a.localeCompare(b));
+    entries.forEach(([childName, childNode]) => {
+      ul.appendChild(renderTreeNode(childName, childNode, currentPath, type));
+    });
+    li.appendChild(ul);
   }
 
-  const meta = document.createElement('div');
-  meta.className = 'gallery-meta';
-  meta.textContent = key.replace(/^soulscape\/(image|video)\//, '');
-  card.appendChild(meta);
-  return card;
+  return li;
 }
 
 async function fetchList(type) {
@@ -190,15 +222,32 @@ async function fetchList(type) {
 
 async function refreshList() {
   setListStatus('Loading...');
-  clearGallery();
+  clearTree();
   try {
     const [images, videos] = await Promise.all([fetchList('image'), fetchList('video')]);
-    images.items.forEach((item) => {
-      imageGallery.appendChild(createItem(item.cdnUrl, item.key, false));
+    const imageTree = buildTree(images.items, 'image');
+    const videoTree = buildTree(videos.items, 'video');
+
+    const wrapper = document.createElement('ul');
+    const imageRoot = document.createElement('li');
+    imageRoot.innerHTML = '<span class=\"folder\">🖼 Images</span>';
+    const imageList = document.createElement('ul');
+    Object.entries(imageTree).forEach(([name, node]) => {
+      imageList.appendChild(renderTreeNode(name, node, [], 'image'));
     });
-    videos.items.forEach((item) => {
-      videoGallery.appendChild(createItem(item.cdnUrl, item.key, true));
+    imageRoot.appendChild(imageList);
+    wrapper.appendChild(imageRoot);
+
+    const videoRoot = document.createElement('li');
+    videoRoot.innerHTML = '<span class=\"folder\">🎬 Videos</span>';
+    const videoList = document.createElement('ul');
+    Object.entries(videoTree).forEach(([name, node]) => {
+      videoList.appendChild(renderTreeNode(name, node, [], 'video'));
     });
+    videoRoot.appendChild(videoList);
+    wrapper.appendChild(videoRoot);
+
+    fileTree.appendChild(wrapper);
     setListStatus('Loaded');
   } catch (err) {
     setListStatus('Error');
