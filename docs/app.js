@@ -174,7 +174,7 @@ function buildTree(items, type) {
     const parts = trimmed.split('/').filter(Boolean);
     insertPath(root, parts, item);
   });
-  return root;
+  return root.children || {};
 }
 
 function renderTreeNode(name, node, pathParts, type) {
