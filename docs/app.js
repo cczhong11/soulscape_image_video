@@ -97,40 +97,75 @@ uploadBtn.addEventListener('click', async () => {
   uploadBtn.disabled = true;
 
   try {
-    const response = await fetch(API_ENDPOINT, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        fileName: currentFile.name,
-        contentType: currentFile.type,
-        folder: folderInput.value.trim()
-      })
-    });
+    if (currentFile.type.startsWith('image/')) {
+      setStatus('Compressing...');
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error('Failed to read file.'));
+        reader.readAsDataURL(currentFile);
+      });
 
-    if (!response.ok) {
-      throw new Error('Failed to get upload URL.');
+      const response = await fetch(API_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fileName: currentFile.name,
+          contentType: currentFile.type,
+          folder: folderInput.value.trim(),
+          imageBase64: dataUrl,
+          targetBytes: 1000000
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Compression upload failed.');
+      }
+
+      const data = await response.json();
+      currentCdnUrl = data.cdnUrl;
+      cdnUrlEl.textContent = data.cdnUrl;
+      cdnUrlEl.href = data.cdnUrl;
+      meta.textContent = `${currentFile.name} • ${(data.bytes / (1024 * 1024)).toFixed(2)} MB (compressed)`;
+      result.classList.add('visible');
+      copyBtn.disabled = false;
+      setStatus('Complete');
+    } else {
+      const response = await fetch(API_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fileName: currentFile.name,
+          contentType: currentFile.type,
+          folder: folderInput.value.trim()
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get upload URL.');
+      }
+
+      const data = await response.json();
+      setStatus('Uploading...');
+
+      const putResponse = await fetch(data.uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': currentFile.type },
+        body: currentFile
+      });
+
+      if (!putResponse.ok) {
+        throw new Error('Upload failed.');
+      }
+
+      currentCdnUrl = data.cdnUrl;
+      cdnUrlEl.textContent = data.cdnUrl;
+      cdnUrlEl.href = data.cdnUrl;
+      meta.textContent = `${currentFile.name} • ${(currentFile.size / (1024 * 1024)).toFixed(2)} MB`;
+      result.classList.add('visible');
+      copyBtn.disabled = false;
+      setStatus('Complete');
     }
-
-    const data = await response.json();
-    setStatus('Uploading...');
-
-    const putResponse = await fetch(data.uploadUrl, {
-      method: 'PUT',
-      headers: { 'Content-Type': currentFile.type },
-      body: currentFile
-    });
-
-    if (!putResponse.ok) {
-      throw new Error('Upload failed.');
-    }
-
-    currentCdnUrl = data.cdnUrl;
-    cdnUrlEl.textContent = data.cdnUrl;
-    cdnUrlEl.href = data.cdnUrl;
-    meta.textContent = `${currentFile.name} • ${(currentFile.size / (1024 * 1024)).toFixed(2)} MB`;
-    result.classList.add('visible');
-    copyBtn.disabled = false;
-    setStatus('Complete');
   } catch (err) {
     setStatus('Error');
     alert(err.message);

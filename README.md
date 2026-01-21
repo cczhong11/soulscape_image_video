@@ -15,6 +15,18 @@
 }
 ```
 
+Image upload (server-side compression):
+```json
+{
+  "fileName": "photo.jpg",
+  "contentType": "image/jpeg",
+  "folder": "campaign-01/hero",
+  "imageBase64": "data:image/jpeg;base64,...",
+  "targetBytes": 1000000
+}
+```
+Note: API Gateway has payload size limits; very large images may need client-side compression.
+
 ## API
 `POST https://oiuw4wyhzb.execute-api.us-east-1.amazonaws.com/upload`
 
