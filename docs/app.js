@@ -114,7 +114,7 @@ uploadBtn.addEventListener('click', async () => {
           contentType: currentFile.type,
           folder: folderInput.value.trim(),
           imageBase64: dataUrl,
-          targetBytes: 1000000
+          targetBytes: 500000
         })
       });
 

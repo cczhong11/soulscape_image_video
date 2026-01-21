@@ -22,7 +22,7 @@ Image upload (server-side compression):
   "contentType": "image/jpeg",
   "folder": "campaign-01/hero",
   "imageBase64": "data:image/jpeg;base64,...",
-  "targetBytes": 1000000
+  "targetBytes": 500000
 }
 ```
 Note: API Gateway has payload size limits; very large images may need client-side compression.
