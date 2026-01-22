@@ -8,15 +8,14 @@ const copyBtn = document.getElementById('copy');
 const statusEl = document.getElementById('status');
 const preview = document.getElementById('preview');
 const result = document.getElementById('result');
-const cdnUrlEl = document.getElementById('cdnUrl');
-const meta = document.getElementById('meta');
+const resultList = document.getElementById('result-list');
 const folderInput = document.getElementById('folder');
 const listStatusEl = document.getElementById('list-status');
 const refreshBtn = document.getElementById('refresh-list');
 const fileTree = document.getElementById('file-tree');
 
-let currentFile = null;
-let currentCdnUrl = '';
+let currentFiles = [];
+let currentCdnUrls = [];
 
 function setStatus(text) {
   statusEl.textContent = text;
@@ -24,48 +23,77 @@ function setStatus(text) {
 
 function resetResult() {
   result.classList.remove('visible');
-  cdnUrlEl.textContent = '';
-  cdnUrlEl.href = '#';
-  meta.textContent = '';
+  resultList.innerHTML = '';
   copyBtn.disabled = true;
-  currentCdnUrl = '';
+  currentCdnUrls = [];
 }
 
-function renderPreview(file) {
+function renderPreview(files) {
   preview.innerHTML = '';
 
-  if (!file) {
-    preview.textContent = 'No file selected yet.';
+  if (!files.length) {
+    preview.textContent = 'No files selected yet.';
     return;
   }
 
-  if (file.type.startsWith('image/')) {
+  if (files.length === 1 && files[0].type.startsWith('image/')) {
     const img = document.createElement('img');
-    img.src = URL.createObjectURL(file);
+    img.src = URL.createObjectURL(files[0]);
     img.onload = () => URL.revokeObjectURL(img.src);
     preview.appendChild(img);
-  } else if (file.type.startsWith('video/')) {
+    return;
+  }
+
+  if (files.length === 1 && files[0].type.startsWith('video/')) {
     const video = document.createElement('video');
-    video.src = URL.createObjectURL(file);
+    video.src = URL.createObjectURL(files[0]);
     video.controls = true;
     video.onloadeddata = () => URL.revokeObjectURL(video.src);
     preview.appendChild(video);
-  } else {
-    preview.textContent = 'Unsupported file type.';
+    return;
   }
+
+  const grid = document.createElement('div');
+  grid.className = 'preview-grid';
+  files.forEach((item) => {
+    const card = document.createElement('div');
+    card.className = 'preview-card';
+
+    if (item.type.startsWith('image/')) {
+      const img = document.createElement('img');
+      img.src = URL.createObjectURL(item);
+      img.onload = () => URL.revokeObjectURL(img.src);
+      card.appendChild(img);
+    } else {
+      const icon = document.createElement('div');
+      icon.className = 'preview-icon';
+      icon.textContent = '▶';
+      card.appendChild(icon);
+    }
+
+    const info = document.createElement('div');
+    info.className = 'preview-info';
+    info.textContent = item.name;
+    card.appendChild(info);
+
+    grid.appendChild(card);
+  });
+  preview.appendChild(grid);
 }
 
-function setFile(file) {
-  currentFile = file;
-  uploadBtn.disabled = !file;
+function setFiles(files) {
+  currentFiles = files;
+  uploadBtn.disabled = files.length === 0;
   resetResult();
-  renderPreview(file);
-  setStatus(file ? 'Ready' : 'Idle');
+  renderPreview(files);
+  setStatus(files.length ? `Ready (${files.length} selected)` : 'Idle');
 }
 
 fileInput.addEventListener('change', (event) => {
-  const file = event.target.files[0];
-  setFile(file);
+  const selected = Array.from(event.target.files || []).filter((file) =>
+    file.type.startsWith('image/') || file.type.startsWith('video/')
+  );
+  setFiles(selected);
 });
 
 ['dragenter', 'dragover'].forEach((eventName) => {
@@ -83,104 +111,138 @@ fileInput.addEventListener('change', (event) => {
 });
 
 drop.addEventListener('drop', (event) => {
-  const file = event.dataTransfer.files[0];
-  if (file) {
-    fileInput.files = event.dataTransfer.files;
-    setFile(file);
+  const selected = Array.from(event.dataTransfer.files || []).filter((file) =>
+    file.type.startsWith('image/') || file.type.startsWith('video/')
+  );
+  if (selected.length) {
+    setFiles(selected);
   }
 });
 
 uploadBtn.addEventListener('click', async () => {
-  if (!currentFile) return;
+  if (!currentFiles.length) return;
 
-  setStatus('Requesting upload URL...');
+  setStatus('Starting uploads...');
   uploadBtn.disabled = true;
 
   try {
-    if (currentFile.type.startsWith('image/')) {
-      setStatus('Compressing...');
-      const dataUrl = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = () => reject(new Error('Failed to read file.'));
-        reader.readAsDataURL(currentFile);
-      });
+    const folder = folderInput.value.trim();
+    const uploads = [];
 
-      const response = await fetch(API_ENDPOINT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fileName: currentFile.name,
-          contentType: currentFile.type,
-          folder: folderInput.value.trim(),
-          imageBase64: dataUrl,
-          targetBytes: 500000
-        })
-      });
+    for (let index = 0; index < currentFiles.length; index += 1) {
+      const file = currentFiles[index];
+      const label = `Uploading ${index + 1} of ${currentFiles.length}`;
 
-      if (!response.ok) {
-        throw new Error('Compression upload failed.');
+      if (file.type.startsWith('image/')) {
+        setStatus(`Compressing ${index + 1} of ${currentFiles.length}`);
+        const dataUrl = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = () => reject(new Error('Failed to read file.'));
+          reader.readAsDataURL(file);
+        });
+
+        const response = await fetch(API_ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fileName: file.name,
+            contentType: file.type,
+            folder,
+            imageBase64: dataUrl,
+            targetBytes: 500000
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('Compression upload failed.');
+        }
+
+        const data = await response.json();
+        uploads.push({
+          fileName: file.name,
+          cdnUrl: data.cdnUrl,
+          bytes: data.bytes,
+          compressed: true
+        });
+        setStatus(label);
+      } else {
+        const response = await fetch(API_ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fileName: file.name,
+            contentType: file.type,
+            folder
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to get upload URL.');
+        }
+
+        const data = await response.json();
+        setStatus(label);
+
+        const putResponse = await fetch(data.uploadUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': file.type },
+          body: file
+        });
+
+        if (!putResponse.ok) {
+          throw new Error('Upload failed.');
+        }
+
+        uploads.push({
+          fileName: file.name,
+          cdnUrl: data.cdnUrl,
+          bytes: file.size,
+          compressed: false
+        });
       }
-
-      const data = await response.json();
-      currentCdnUrl = data.cdnUrl;
-      cdnUrlEl.textContent = data.cdnUrl;
-      cdnUrlEl.href = data.cdnUrl;
-      meta.textContent = `${currentFile.name} • ${(data.bytes / (1024 * 1024)).toFixed(2)} MB (compressed)`;
-      result.classList.add('visible');
-      copyBtn.disabled = false;
-      setStatus('Complete');
-    } else {
-      const response = await fetch(API_ENDPOINT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fileName: currentFile.name,
-          contentType: currentFile.type,
-          folder: folderInput.value.trim()
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to get upload URL.');
-      }
-
-      const data = await response.json();
-      setStatus('Uploading...');
-
-      const putResponse = await fetch(data.uploadUrl, {
-        method: 'PUT',
-        headers: { 'Content-Type': currentFile.type },
-        body: currentFile
-      });
-
-      if (!putResponse.ok) {
-        throw new Error('Upload failed.');
-      }
-
-      currentCdnUrl = data.cdnUrl;
-      cdnUrlEl.textContent = data.cdnUrl;
-      cdnUrlEl.href = data.cdnUrl;
-      meta.textContent = `${currentFile.name} • ${(currentFile.size / (1024 * 1024)).toFixed(2)} MB`;
-      result.classList.add('visible');
-      copyBtn.disabled = false;
-      setStatus('Complete');
     }
+
+    currentCdnUrls = uploads.map((item) => item.cdnUrl);
+    resultList.innerHTML = '';
+    uploads.forEach((item) => {
+      const row = document.createElement('div');
+      row.className = 'result-item';
+
+      const link = document.createElement('a');
+      link.href = item.cdnUrl;
+      link.target = '_blank';
+      link.rel = 'noreferrer';
+      link.textContent = item.cdnUrl;
+
+      const itemMeta = document.createElement('div');
+      const sizeMb = (item.bytes / (1024 * 1024)).toFixed(2);
+      itemMeta.className = 'meta';
+      itemMeta.textContent = `${item.fileName} • ${sizeMb} MB${item.compressed ? ' (compressed)' : ''}`;
+
+      row.appendChild(link);
+      row.appendChild(itemMeta);
+      resultList.appendChild(row);
+    });
+
+    result.classList.add('visible');
+    copyBtn.disabled = currentCdnUrls.length === 0;
+    setStatus('Complete');
   } catch (err) {
     setStatus('Error');
     alert(err.message);
   } finally {
-    uploadBtn.disabled = !currentFile;
+    uploadBtn.disabled = currentFiles.length === 0;
   }
 });
 
 copyBtn.addEventListener('click', async () => {
-  if (!currentCdnUrl) return;
-  await navigator.clipboard.writeText(currentCdnUrl);
+  if (!currentCdnUrls.length) return;
+  await navigator.clipboard.writeText(currentCdnUrls.join('\n'));
   setStatus('Copied');
 });
 
-setFile(null);
+setFiles([]);
 
 function setListStatus(text) {
   listStatusEl.textContent = text;

@@ -21,19 +21,19 @@
       <section class="panel">
         <div class="panel-top">
           <div class="panel-title">
-            <h2>Upload a file</h2>
+            <h2>Upload files</h2>
             <span id="status">Idle</span>
           </div>
           <p class="panel-sub">We generate a secure upload link and put the file into S3, then return the CDN URL.</p>
         </div>
 
         <label class="drop" id="drop">
-          <input id="file" type="file" accept="image/*,video/*" />
+          <input id="file" type="file" accept="image/*,video/*" multiple />
           <div class="drop-inner">
             <div class="icon">⬤</div>
             <div>
-              <strong>Click to choose</strong> or drag & drop
-              <span>PNG, JPG, GIF, MP4, MOV, WEBM</span>
+              <strong>Click to choose files</strong> or drag & drop
+              <span>PNG, JPG, GIF, MP4, MOV, WEBM • multi-select supported</span>
             </div>
           </div>
         </label>
@@ -52,11 +52,8 @@
         </div>
 
         <div class="result" id="result">
-          <div>
-            <div class="label">CDN URL</div>
-            <a id="cdnUrl" href="#" target="_blank" rel="noreferrer"></a>
-          </div>
-          <div class="meta" id="meta"></div>
+          <div class="label">CDN URLs</div>
+          <div class="result-list" id="result-list"></div>
         </div>
       </section>
 
